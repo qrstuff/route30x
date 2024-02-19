@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cloudfront + Lambda@edge deployment stack.
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  CdnCertificateArn:
+    Type: String
+    Description: ARN of the wildcard certificate for source domain
+  DestinationDomain:
+    Type: String
+    Description: The Domain of the destination to redirect requests
+  StatusCode:
+    Type: String
+    Description: The status code of the redirect
+    AllowedValues:
+      - 301
+      - 302
+    Default: 301
+  ZoneName:
+    Type: String
+    Description: Source zone name
+  ZoneSubdomain:
+    Type: String
+    Description: Source zone subdomain
+
+Resources:
+    CFDistribution:
+        Type: AWS::CloudFront::Distribution
+        Properties:
+          DistributionConfig:
+            Enabled: 'true'
+            Comment: !Sub '${ZoneSubdomain}.${ZoneName} - Automatic Redirect using Lambda@Edge'
+            Aliases:
+              - !Join [
+                ".",
+                [!Ref ZoneSubdomain, !Ref ZoneName]
+              ]
+            Origins:
+              -
+                Id: MyOrigin
+                DomainName: aws.amazon.com
+                CustomOriginConfig:
+                  HTTPPort: 80
+                  OriginProtocolPolicy: match-viewer
+            DefaultCacheBehavior:
+              TargetOriginId: MyOrigin
+              LambdaFunctionAssociations:
+                -
+                  EventType: origin-request
+                  LambdaFunctionARN: !Ref LambdaEdgeFunction.Version
+              ForwardedValues:
+                QueryString: 'true'
+                Headers:
+                  - Origin
+                  - Host
+                Cookies:
+                  Forward: none
+              ViewerProtocolPolicy: redirect-to-https
+            ViewerCertificate:
+              AcmCertificateArn: !Ref CdnCertificateArn
+              MinimumProtocolVersion: TLSv1.2_2021
+              SslSupportMethod: sni-only
+
+    LambdaEdgeFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+          CodeUri:
+          AutoPublishAlias: live
+          Environment:
+            Variables:
+              STATUS_CODE: !Ref StatusCode
+              DESTINATION: !Ref DestinationDomain
+              SOURCE: !Join [ ".", [!Ref ZoneSubdomain, !Ref ZoneName] ]
+          Handler: index.handler
+          Role: !GetAtt LambdaEdgeFunctionRole.Arn
+          Runtime: nodejs20.x
+          Timeout: 5
+
+    LambdaEdgeFunctionRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+          Path: "/"
+          ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Sid: "AllowLambdaServiceToAssumeRole"
+                Effect: "Allow"
+                Action:
+                  - "sts:AssumeRole"
+                Principal:
+                  Service:
+                    - "lambda.amazonaws.com"
+                    - "edgelambda.amazonaws.com"
+
+Outputs:
+    LambdaEdgeFunctionVersion:
+      Description: Lambda@Edge Sample Function ARN with Version
+      Value: !Ref LambdaEdgeFunction.Version
+
+    CFDistribution:
+      Description: Cloudfront Distribution Domain Name
+      Value: !GetAtt CFDistribution.DomainName
