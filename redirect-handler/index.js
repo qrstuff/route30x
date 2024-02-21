@@ -1,15 +1,15 @@
 exports.handler = (event, context, callback) => {
     const request = event.Records[0].cf.request;
     const host = request.headers.host.find(item => item.key === "Host").value;
-    const source = process.env.SOURCE
-    const destination = process.env.DESTINATION
-    const statusCode = process.env.STATUS_CODE
+    const source =  request.origin.custom.customHeaders["x-env-source"][0].value;
+    const destination = request.origin.custom.customHeaders["x-env-destination"][0].value;
+    const statusCode = request.origin.custom.customHeaders["x-env-statuscode"][0].value;
     const statusDescription = {
         "301" : "Moved Permanently",
         "302" : "Found"
     };
 
-    console.log("------request------:", request, host);
+    console.log("------request------:", JSON.stringify(request), host);
 
     if (host != source) {
         response =  {
@@ -26,12 +26,17 @@ exports.handler = (event, context, callback) => {
               location: [
                 {
                   key: "Location",
-                  value: destination + request.uri
+                  value: "https://"+ destination + request.uri
                 }
               ],
+              host: [{
+                  key: 'Host',
+                  value: "https://"+ destination
+              }],
               "aws-redirect-from": [{key:"aws-redirect-from", value: host}]
             }
         };
+        console.log("------response------:", JSON.stringify(response), host);
     }
 
     callback(null, response);

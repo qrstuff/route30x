@@ -35,6 +35,7 @@ Resources:
                 ".",
                 [!Ref ZoneSubdomain, !Ref ZoneName]
               ]
+              - !Ref ZoneName
             Origins:
               -
                 Id: MyOrigin
@@ -42,6 +43,13 @@ Resources:
                 CustomOriginConfig:
                   HTTPPort: 80
                   OriginProtocolPolicy: match-viewer
+                OriginCustomHeaders:
+                  - HeaderName: 'x-env-statuscode'
+                    HeaderValue: !Ref StatusCode
+                  - HeaderName: 'x-env-destination'
+                    HeaderValue: !Ref DestinationDomain
+                  - HeaderName: 'x-env-source'
+                    HeaderValue: !Join [ ".", [!Ref ZoneSubdomain, !Ref ZoneName] ]
             DefaultCacheBehavior:
               TargetOriginId: MyOrigin
               LambdaFunctionAssociations:
@@ -64,17 +72,29 @@ Resources:
     LambdaEdgeFunction:
         Type: AWS::Serverless::Function
         Properties:
-          CodeUri:
+          CodeUri: ./redirect-handler
           AutoPublishAlias: live
-          Environment:
-            Variables:
-              STATUS_CODE: !Ref StatusCode
-              DESTINATION: !Ref DestinationDomain
-              SOURCE: !Join [ ".", [!Ref ZoneSubdomain, !Ref ZoneName] ]
+          EventInvokeConfig:
+            MaximumEventAgeInSeconds: 21600
+            MaximumRetryAttempts: 2
           Handler: index.handler
           Role: !GetAtt LambdaEdgeFunctionRole.Arn
           Runtime: nodejs20.x
           Timeout: 5
+          PackageType: Zip
+          Policies:
+            - Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                  Resource: arn:aws:logs:*:961354904951:*
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - >-
+                      arn:aws:logs:*:961354904951:log-group:/aws/lambda/*:*
 
     LambdaEdgeFunctionRole:
       Type: "AWS::IAM::Role"
@@ -94,6 +114,16 @@ Resources:
                   Service:
                     - "lambda.amazonaws.com"
                     - "edgelambda.amazonaws.com"
+
+    CloudFrontDNS:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneName: !Join ["", [!Ref ZoneName, .]]
+        Name: !Join ["", [!Ref ZoneSubdomain, ., !Ref ZoneName, .]]
+        Type: CNAME
+        TTL: '3600'
+        ResourceRecords:
+          - !GetAtt CFDistribution.DomainName
 
 Outputs:
     LambdaEdgeFunctionVersion:
