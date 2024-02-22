@@ -9,8 +9,15 @@ Parameters:
   DestinationDomain:
     Type: String
     Description: The Domain of the destination to redirect requests
-  StatusCode:
+  EnableLogs:
     Type: String
+    Description: Lambda@Edge creates logs in multiple locations based on traffic. Switch to enable/disable logs
+    AllowedValues:
+      - true
+      - false
+    Default: true
+  StatusCode:
+    Type: Number
     Description: The status code of the redirect
     AllowedValues:
       - 301
@@ -22,6 +29,9 @@ Parameters:
   ZoneSubdomain:
     Type: String
     Description: Source zone subdomain
+
+Conditions:
+  LogsEnabled: !Equals [!Ref EnableLogs, true]
 
 Resources:
     CFDistribution:
@@ -84,11 +94,11 @@ Resources:
           PackageType: Zip
           Policies:
             - Statement:
-                - Effect: Allow
+                - Effect: !If [ LogsEnabled, "Allow", "Deny"]
                   Action:
                     - logs:CreateLogGroup
                   Resource: arn:aws:logs:*:961354904951:*
-                - Effect: Allow
+                - Effect: !If [ LogsEnabled, "Allow", "Deny"]
                   Action:
                     - logs:CreateLogStream
                     - logs:PutLogEvents
@@ -123,6 +133,16 @@ Resources:
         Type: CNAME
         TTL: '3600'
         ResourceRecords:
+          - !GetAtt CFDistribution.DomainName
+
+    CloudFrontDNSBase:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneName: !Join ["", [!Ref ZoneName, .]]
+        Name: !Join ["", [!Ref ZoneName, .]]
+        Type: A
+        TTL: '3600'
+        AliasTarget:
           - !GetAtt CFDistribution.DomainName
 
 Outputs:
