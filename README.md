@@ -23,6 +23,7 @@ aws cloudformation create-stack --stack-name checkpoint --template-body file://o
 ParameterKey=CdnCertificateArn,ParameterValue=source-domain-wildcard-cert-arn \
 ParameterKey=DestinationDomain,ParameterValue=destination-domain \
 ParameterKey=ZoneName,ParameterValue=source-zone-name \
+ParameterKey=ZoneId,ParameterValue=source-zone-id \
 ParameterKey=ZoneSubdomain,ParameterValue=source-zone-subdomain
 --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND
 ```
@@ -52,6 +53,9 @@ Following parameters are available for customization. Defaults can be set in the
       - 301
       - 302
     Default: 301
+  ZoneId:
+    Type: String
+    Description: Source zone ID
   ZoneName:
     Type: String
     Description: Source zone name
