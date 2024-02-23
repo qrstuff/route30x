@@ -23,9 +23,6 @@ Parameters:
       - 301
       - 302
     Default: 301
-  ZoneId:
-    Type: String
-    Description: Source zone ID
   ZoneName:
     Type: String
     Description: Source zone name
@@ -100,14 +97,13 @@ Resources:
                 - Effect: !If [ LogsEnabled, "Allow", "Deny"]
                   Action:
                     - logs:CreateLogGroup
-                  Resource: arn:aws:logs:*:961354904951:*
+                  Resource: !Sub arn:aws:logs:*:${AWS::AccountId}:*
                 - Effect: !If [ LogsEnabled, "Allow", "Deny"]
                   Action:
                     - logs:CreateLogStream
                     - logs:PutLogEvents
                   Resource:
-                    - >-
-                      arn:aws:logs:*:961354904951:log-group:/aws/lambda/*:*
+                    - !Sub arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*:*
 
     LambdaEdgeFunctionRole:
       Type: "AWS::IAM::Role"
@@ -144,9 +140,8 @@ Resources:
         HostedZoneName: !Join ["", [!Ref ZoneName, .]]
         Name: !Join ["", [!Ref ZoneName, .]]
         Type: A
-        TTL: '3600'
         AliasTarget:
-          HostedZoneId: !Ref ZoneId
+          HostedZoneId: Z2FDTNDATAQYW2
           DNSName: !GetAtt CFDistribution.DomainName
 
 Outputs:

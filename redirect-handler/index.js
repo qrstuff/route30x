@@ -3,18 +3,20 @@ exports.handler = (event, context, callback) => {
   const destination = request.origin.custom.customHeaders["x-env-destination"][0].value;
   const statusCode = parseInt(request.origin.custom.customHeaders["x-env-statuscode"][0].value);
 
-  let url = "https://"+ destination + request.uri;
+  let url = "https://" + destination + request.uri;
   if (request.querystring) {
-      url += '?';
-      url += request.querystring;
+    url += '?';
+    url += request.querystring;
   }
 
   callback(
-    null,
-    {
+    null, {
       status: statusCode,
       headers: {
-        location: url,
+        location: [{
+          key: 'Location',
+          value: url
+        }],
       }
     }
   );
