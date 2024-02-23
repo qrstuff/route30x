@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Description: Cloudfront + Lambda@edge deployment stack.
 Transform: AWS::Serverless-2016-10-31
 
@@ -34,121 +34,115 @@ Conditions:
   LogsEnabled: !Equals [!Ref EnableLogs, true]
 
 Resources:
-    CFDistribution:
-        Type: AWS::CloudFront::Distribution
-        Properties:
-          DistributionConfig:
-            Enabled: 'true'
-            Comment: !Sub '${ZoneSubdomain}.${ZoneName} - Automatic Redirect using Lambda@Edge'
-            Aliases:
-              - !Join [
-                ".",
-                [!Ref ZoneSubdomain, !Ref ZoneName]
-              ]
-              - !Ref ZoneName
-            Origins:
-              -
-                Id: MyOrigin
-                DomainName: aws.amazon.com
-                CustomOriginConfig:
-                  HTTPPort: 80
-                  OriginProtocolPolicy: match-viewer
-                OriginCustomHeaders:
-                  - HeaderName: 'x-env-statuscode'
-                    HeaderValue: !Ref StatusCode
-                  - HeaderName: 'x-env-destination'
-                    HeaderValue: !Ref DestinationDomain
-                  - HeaderName: 'x-env-source'
-                    HeaderValue: !Join [ ".", [!Ref ZoneSubdomain, !Ref ZoneName] ]
-            DefaultCacheBehavior:
-              TargetOriginId: MyOrigin
-              LambdaFunctionAssociations:
-                -
-                  EventType: origin-request
-                  LambdaFunctionARN: !Ref LambdaEdgeFunction.Version
-              ForwardedValues:
-                QueryString: 'true'
-                Headers:
-                  - Origin
-                  - Host
-                Cookies:
-                  Forward: none
-              ViewerProtocolPolicy: redirect-to-https
-            ViewerCertificate:
-              AcmCertificateArn: !Ref CdnCertificateArn
-              MinimumProtocolVersion: TLSv1.2_2021
-              SslSupportMethod: sni-only
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: "true"
+        Comment: !Sub "${ZoneSubdomain}.${ZoneName} - Automatic Redirect using Lambda@Edge"
+        Aliases:
+          - !Join [".", [!Ref ZoneSubdomain, !Ref ZoneName]]
+          - !Ref ZoneName
+        Origins:
+          - Id: MyOrigin
+            DomainName: aws.amazon.com
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: match-viewer
+            OriginCustomHeaders:
+              - HeaderName: "x-env-statuscode"
+                HeaderValue: !Ref StatusCode
+              - HeaderName: "x-env-destination"
+                HeaderValue: !Ref DestinationDomain
+              - HeaderName: "x-env-source"
+                HeaderValue: !Join [".", [!Ref ZoneSubdomain, !Ref ZoneName]]
+        DefaultCacheBehavior:
+          TargetOriginId: MyOrigin
+          LambdaFunctionAssociations:
+            - EventType: origin-request
+              LambdaFunctionARN: !Ref LambdaEdgeFunction.Version
+          ForwardedValues:
+            QueryString: "true"
+            Headers:
+              - Origin
+              - Host
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CdnCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
 
-    LambdaEdgeFunction:
-        Type: AWS::Serverless::Function
-        Properties:
-          CodeUri: ./redirect-handler
-          AutoPublishAlias: live
-          EventInvokeConfig:
-            MaximumEventAgeInSeconds: 21600
-            MaximumRetryAttempts: 2
-          Handler: index.handler
-          Role: !GetAtt LambdaEdgeFunctionRole.Arn
-          Runtime: nodejs20.x
-          Timeout: 5
-          PackageType: Zip
-          Policies:
-            - Statement:
-                - Effect: !If [ LogsEnabled, "Allow", "Deny"]
-                  Action:
-                    - logs:CreateLogGroup
-                  Resource: !Sub arn:aws:logs:*:${AWS::AccountId}:*
-                - Effect: !If [ LogsEnabled, "Allow", "Deny"]
-                  Action:
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*:*
+  LambdaEdgeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./redirect-handler
+      AutoPublishAlias: live
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 21600
+        MaximumRetryAttempts: 2
+      Handler: index.handler
+      Role: !GetAtt LambdaEdgeFunctionRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 5
+      PackageType: Zip
+      Policies:
+        - Statement:
+            - Effect: !If [LogsEnabled, "Allow", "Deny"]
+              Action:
+                - logs:CreateLogGroup
+              Resource: !Sub arn:aws:logs:*:${AWS::AccountId}:*
+            - Effect: !If [LogsEnabled, "Allow", "Deny"]
+              Action:
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/*:*
 
-    LambdaEdgeFunctionRole:
-      Type: "AWS::IAM::Role"
-      Properties:
-          Path: "/"
-          ManagedPolicyArns:
-              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-          AssumeRolePolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              -
-                Sid: "AllowLambdaServiceToAssumeRole"
-                Effect: "Allow"
-                Action:
-                  - "sts:AssumeRole"
-                Principal:
-                  Service:
-                    - "lambda.amazonaws.com"
-                    - "edgelambda.amazonaws.com"
+  LambdaEdgeFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+                - "edgelambda.amazonaws.com"
 
-    CloudFrontDNS:
-      Type: AWS::Route53::RecordSet
-      Properties:
-        HostedZoneName: !Join ["", [!Ref ZoneName, .]]
-        Name: !Join ["", [!Ref ZoneSubdomain, ., !Ref ZoneName, .]]
-        Type: CNAME
-        TTL: '3600'
-        ResourceRecords:
-          - !GetAtt CFDistribution.DomainName
+  CloudFrontDNS:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Join ["", [!Ref ZoneName, .]]
+      Name: !Join ["", [!Ref ZoneSubdomain, ., !Ref ZoneName, .]]
+      Type: CNAME
+      TTL: "3600"
+      ResourceRecords:
+        - !GetAtt CFDistribution.DomainName
 
-    CloudFrontDNSBase:
-      Type: AWS::Route53::RecordSet
-      Properties:
-        HostedZoneName: !Join ["", [!Ref ZoneName, .]]
-        Name: !Join ["", [!Ref ZoneName, .]]
-        Type: A
-        AliasTarget:
-          HostedZoneId: Z2FDTNDATAQYW2
-          DNSName: !GetAtt CFDistribution.DomainName
+  CloudFrontDNSBase:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Join ["", [!Ref ZoneName, .]]
+      Name: !Join ["", [!Ref ZoneName, .]]
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt CFDistribution.DomainName
 
 Outputs:
-    LambdaEdgeFunctionVersion:
-      Description: Lambda@Edge Sample Function ARN with Version
-      Value: !Ref LambdaEdgeFunction.Version
+  LambdaEdgeFunctionVersion:
+    Description: Lambda@Edge Sample Function ARN with Version
+    Value: !Ref LambdaEdgeFunction.Version
 
-    CFDistribution:
-      Description: Cloudfront Distribution Domain Name
-      Value: !GetAtt CFDistribution.DomainName
+  CFDistribution:
+    Description: Cloudfront Distribution Domain Name
+    Value: !GetAtt CFDistribution.DomainName
